@@ -139,7 +139,7 @@ def validate(image: Image.Image) -> ValidationResult:
     image_emb = _encode_image(image)
 
     layer1_passed, valid_score, invalid_score = _layer1_prompt_check(image_emb)
-    layer2_passed, distance, threshold        = _layer2_prototype_check(image_emb)
+    layer2_passed, distance, threshold = _layer2_prototype_check(image_emb)
 
     is_valid = layer1_passed and layer2_passed
 
