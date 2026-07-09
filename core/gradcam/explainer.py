@@ -101,7 +101,7 @@ def run_gradcam(
         return {"gradcam_results": {}, "semantic_context": "No significant findings detected above threshold."}
 
     input_tensor = _image_to_tensor(image)
-    rgb_array    = _image_to_rgb_array(image)
+    rgb_array = _image_to_rgb_array(image)
     target_layer = _get_target_layer(model)
 
     gradcam_results: dict[str, dict] = {}

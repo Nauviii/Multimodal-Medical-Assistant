@@ -22,7 +22,7 @@ _DEFINITIVE_DIAGNOSIS_PATTERNS = re.compile(
     r"|\banda menderita\b|\banda terkena\b"
     r"|\bdiagnos[ia]s?\s*:\s*\w"
     r"|\bpasti (menderita|terkena)\b"
-    r"|\bdefinitely (have|indicates)\b",
+    r"|\bdefinitely (has|have|indicates)\b",
     re.IGNORECASE,
 )
 
