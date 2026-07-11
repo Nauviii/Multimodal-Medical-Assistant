@@ -1,4 +1,4 @@
-"""SQLAlchemy ORM models untuk semua tabel logging MedAssist."""
+"""SQLAlchemy ORM models for all MedAssist logging tables."""
 
 import uuid
 from datetime import datetime, timezone
@@ -36,7 +36,7 @@ class Session(Base):
 
 
 class Interaction(Base):
-    """Satu request dari user (text atau image)."""
+    """One user request (text or image)."""
     __tablename__ = "interactions"
 
     id = Column(String, primary_key=True, default=_uuid)
@@ -45,13 +45,13 @@ class Interaction(Base):
     raw_query = Column(Text, nullable=True)       # diisi jika text path
     image_hash = Column(String, nullable=True)     # SHA-256 X-ray asli
     xray_storage_url = Column(String, nullable=True)     # Supabase xray-uploads URL
-    gradcam_storage_url = Column(String, nullable=True)  # Supabase gradcam-outputs URL
     timestamp = Column(DateTime, default=_now)
     latency_ms = Column(Integer, nullable=True)
 
     session = relationship("Session", back_populates="interactions")
     cnn_result = relationship("CNNResult", back_populates="interaction", uselist=False)
-    rag_log = relationship("RAGLog", back_populates="interaction", uselist=False)
+    rag_logs = relationship("RAGLog", back_populates="interaction")            # one-to-many
+    gradcam_findings = relationship("GradCAMFinding", back_populates="interaction")  # one-to-many
     llm_output = relationship("LLMOutput", back_populates="interaction", uselist=False)
     feedback = relationship("UserFeedback", back_populates="interaction", uselist=False)
 
@@ -62,43 +62,59 @@ class CNNResult(Base):
 
     id = Column(String, primary_key=True, default=_uuid)
     interaction_id = Column(String, ForeignKey("interactions.id"), nullable=False)
-    all_scores = Column(JSON, nullable=False)   # {condition: confidence} semua 14
-    above_threshold = Column(JSON, nullable=False)   # {condition: confidence} positif saja
+    all_scores = Column(JSON, nullable=False)         # {condition: confidence}, semua 14
+    above_threshold = Column(JSON, nullable=False)    # list[condition], sorted desc by confidence
     low_confidence_flag = Column(Boolean, default=False)
 
     interaction = relationship("Interaction", back_populates="cnn_result")
 
 
+class GradCAMFinding(Base):
+    """One GradCAM++ heatmap for one condition within a single image interaction."""
+    __tablename__ = "gradcam_findings"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    interaction_id = Column(String, ForeignKey("interactions.id"), nullable=False)
+    condition = Column(String, nullable=False)
+    heatmap_storage_url = Column(String, nullable=False)  # Supabase gradcam-outputs URL
+    dominant_zones = Column(JSON, nullable=False)          # list[str], e.g. ["RLZ", "LLZ"]
+    aligned = Column(Boolean, nullable=False)
+    zone_stats = Column(JSON, nullable=False)              # {zone: activation_score}, 7 zona
+
+    interaction = relationship("Interaction", back_populates="gradcam_findings")
+
+
 class RAGLog(Base):
-    """Log retrieval RAG per interaction."""
+    """One retrieval query executed (text path: 1 row; image path: 1 row per condition)."""
     __tablename__ = "rag_logs"
 
     id = Column(String, primary_key=True, default=_uuid)
     interaction_id = Column(String, ForeignKey("interactions.id"), nullable=False)
+    condition = Column(String, nullable=True)     # null untuk text path
     query_used = Column(Text, nullable=False)     # query yang dikirim ke Pinecone
-    retrieved_ids = Column(JSON, nullable=False)     # list chunk IDs
-    scores = Column(JSON, nullable=False)     # list similarity scores
+    retrieved_ids = Column(JSON, nullable=False)  # list chunk_id
+    scores = Column(JSON, nullable=False)         # list similarity score, urutan sama dgn retrieved_ids
     timestamp = Column(DateTime, default=_now)
 
-    interaction = relationship("Interaction", back_populates="rag_log")
+    interaction = relationship("Interaction", back_populates="rag_logs")
 
 
 class LLMOutput(Base):
-    """Output LLM Call 1 dan Call 2 per interaction."""
+    """Output LLM Call 1 and Call 2 (image path) or Q&A answers (text path) per interaction."""
     __tablename__ = "llm_outputs"
 
     id = Column(String, primary_key=True, default=_uuid)
     interaction_id = Column(String, ForeignKey("interactions.id"), nullable=False)
-    call1_output = Column(JSON, nullable=True)   # JSON output LLM Call 1 (image path)
-    call2_output = Column(Text, nullable=True)   # clinical explanation (image path)
-    text_response = Column(Text, nullable=True)  # response Q&A (text path)
+    call1_output = Column(JSON, nullable=True)    # {rag_queries: [...]} (image path)
+    call2_output = Column(JSON, nullable=True)    # {conditions, clinical_summary, cross_specialty_notes}
+    text_response = Column(JSON, nullable=True)   # {answer, cross_specialty_notes} (text path)
     timestamp = Column(DateTime, default=_now)
 
     interaction = relationship("Interaction", back_populates="llm_output")
 
 
 class UserFeedback(Base):
-    """Feedback dokter per interaction."""
+    """Doctor feedback per interaction."""
     __tablename__ = "user_feedback"
 
     id = Column(String, primary_key=True, default=_uuid)

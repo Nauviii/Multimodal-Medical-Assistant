@@ -16,53 +16,53 @@ class Settings(BaseSettings):
 
     # Auth
     jwt_secret_key: str
-    jwt_algorithm: str               = "HS256"
+    jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
 
       # Groq
     groq_api_key: str
-    groq_model: str                  = "openai/gpt-oss-20b"  # migrated: llama-3.1-8b-instant shuts down 2026-08-16
-    llm_temperature: float           = 0.2
-    llm_max_tokens: int              = 1024
+    groq_model: str = "openai/gpt-oss-20b"  # migrated: llama-3.1-8b-instant shuts down 2026-08-16
+    llm_temperature: float = 0.2
+    llm_max_tokens: int = 1024
 
     # Database
     database_url: str
     sql_agent_readonly_url: str
-    sql_agent_max_rows: int          = 500
+    sql_agent_max_rows: int = 500
 
     # Supabase Storage
     supabase_url: str
     supabase_service_key: str
-    supabase_xray_bucket: str        = "xray-uploads"
-    supabase_gradcam_bucket: str     = "gradcam-outputs"
+    supabase_xray_bucket: str = "xray-uploads"
+    supabase_gradcam_bucket: str = "gradcam-outputs"
 
     # Pinecone
     pinecone_api_key: str
-    pinecone_index_name: str         = "medassist-knowledge"
-    pinecone_namespace: str          = "clinical"
-    rag_embedding_model: str         = "sentence-transformers/all-MiniLM-L6-v2"
-    rag_top_k: int                   = 4
-    rag_score_threshold: float       = 0.3
+    pinecone_index_name: str  = "medassist-knowledge"
+    pinecone_namespace: str = "clinical"
+    rag_embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    rag_top_k: int = 4
+    rag_score_threshold: float = 0.3
 
     # Redis (cache + session memory)
     redis_url: str
-    redis_cache_ttl_seconds: int     = 2_592_000   # 30 days
-    redis_session_ttl_seconds: int   = 3_600       # 1 hour, sliding
-    kb_version: str                  = "v1"        # bump after KB content updates to invalidate cache
+    redis_cache_ttl_seconds: int = 2_592_000   # 30 days
+    redis_session_ttl_seconds: int = 3_600       # 1 hour, sliding
+    kb_version: str = "v1"        # bump after KB content updates to invalidate cache
 
     # CNN
     model_repo_id: str
-    model_dir: Path                  = BASE_DIR / "models" / "weights"
-    model_weights_path: Path         = model_dir / "multilabel_model.pt"
-    thresholds_path: Path            = model_dir / "multilabel_thresholds.json"
-    cnn_image_size: int              = 224
-    cnn_num_classes: int             = 14
+    model_dir: Path = BASE_DIR / "models" / "weights"
+    model_weights_path: Path = model_dir / "multilabel_model.pt"
+    thresholds_path: Path = model_dir / "multilabel_thresholds.json"
+    cnn_image_size: int = 224
+    cnn_num_classes: int = 14
 
     # CLIP
-    clip_model_name: str             = "ViT-B/32"
-    clip_prototype: Path             = model_dir / "clip_prototype.json"
-    clip_fallback_threshold: float   = 0.6
-    clip_valid_prompts: list[str]    = [
+    clip_model_name: str = "ViT-B/32"
+    clip_prototype: Path = model_dir / "clip_prototype.json"
+    clip_fallback_threshold: float = 0.6
+    clip_valid_prompts: list[str] = [
         "a chest X-ray image",
         "a thoracic radiograph",
         "a medical X-ray of the lungs",
@@ -96,8 +96,8 @@ class Settings(BaseSettings):
     }
 
     # Logging 
-    log_dir: Path                    = BASE_DIR / "logs"
-    log_level: str                   = "INFO"
+    log_dir: Path = BASE_DIR / "logs"
+    log_level: str = "INFO"
 
     @field_validator("model_dir", "log_dir", mode="before")
     @classmethod
