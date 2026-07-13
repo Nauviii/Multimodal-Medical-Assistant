@@ -42,7 +42,7 @@ class Session(Base):
 
     id = Column(String, primary_key=True, default=_uuid)
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
-    role = Column(String, nullable=False)
+    role = Column(String, nullable=False)   
     started_at = Column(DateTime, default=_now)
     ended_at = Column(DateTime, nullable=True)
 
@@ -58,15 +58,15 @@ class Interaction(Base):
     session_id = Column(String, ForeignKey("sessions.id"), nullable=False)
     interaction_type = Column(String, nullable=False)   
     raw_query = Column(Text, nullable=True)       
-    image_hash = Column(String, nullable=True)     
+    image_hash = Column(String, nullable=True)    
     xray_storage_url = Column(String, nullable=True)     
     timestamp = Column(DateTime, default=_now)
     latency_ms = Column(Integer, nullable=True)
 
     session = relationship("Session", back_populates="interactions")
     cnn_result = relationship("CNNResult", back_populates="interaction", uselist=False)
-    rag_logs = relationship("RAGLog", back_populates="interaction")            
-    gradcam_findings = relationship("GradCAMFinding", back_populates="interaction")  
+    rag_logs = relationship("RAGLog", back_populates="interaction")            # one-to-many
+    gradcam_findings = relationship("GradCAMFinding", back_populates="interaction")  # one-to-many
     llm_output = relationship("LLMOutput", back_populates="interaction", uselist=False)
     feedback = relationship("UserFeedback", back_populates="interaction", uselist=False)
 
@@ -76,8 +76,8 @@ class CNNResult(Base):
     __tablename__ = "cnn_results"
 
     id = Column(String, primary_key=True, default=_uuid)
-    interaction_id = Column(String, ForeignKey("interactions.id"), nullable=False)
-    all_scores = Column(JSON, nullable=False)        
+    interaction_id = Column(String, ForeignKey("interactions.id"), nullable=False, unique=True)
+    all_scores = Column(JSON, nullable=False)         
     above_threshold = Column(JSON, nullable=False)    
     low_confidence_flag = Column(Boolean, default=False)
 
@@ -91,10 +91,10 @@ class GradCAMFinding(Base):
     id = Column(String, primary_key=True, default=_uuid)
     interaction_id = Column(String, ForeignKey("interactions.id"), nullable=False)
     condition = Column(String, nullable=False)
-    heatmap_storage_url = Column(String, nullable=False)  
-    dominant_zones = Column(JSON, nullable=False)         
+    heatmap_storage_url = Column(String, nullable=False)  # Supabase gradcam-outputs URL
+    dominant_zones = Column(JSON, nullable=False)          
     aligned = Column(Boolean, nullable=False)
-    zone_stats = Column(JSON, nullable=False)              
+    zone_stats = Column(JSON, nullable=False)             
 
     interaction = relationship("Interaction", back_populates="gradcam_findings")
 
@@ -119,7 +119,7 @@ class LLMOutput(Base):
     __tablename__ = "llm_outputs"
 
     id = Column(String, primary_key=True, default=_uuid)
-    interaction_id = Column(String, ForeignKey("interactions.id"), nullable=False)
+    interaction_id = Column(String, ForeignKey("interactions.id"), nullable=False, unique=True)
     call1_output = Column(JSON, nullable=True)    # {rag_queries: [...]} (image path)
     call2_output = Column(JSON, nullable=True)    # {conditions, clinical_summary, cross_specialty_notes}
     text_response = Column(JSON, nullable=True)   # {answer, cross_specialty_notes} (text path)
@@ -133,8 +133,8 @@ class UserFeedback(Base):
     __tablename__ = "user_feedback"
 
     id = Column(String, primary_key=True, default=_uuid)
-    interaction_id = Column(String, ForeignKey("interactions.id"), nullable=False)
-    is_correct = Column(Boolean, nullable=False) 
+    interaction_id = Column(String, ForeignKey("interactions.id"), nullable=False, unique=True)
+    is_correct = Column(Boolean, nullable=False)   
     comment = Column(Text, nullable=True)
     submitted_at = Column(DateTime, default=_now)
 

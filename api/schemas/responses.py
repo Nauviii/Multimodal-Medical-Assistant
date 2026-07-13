@@ -1,5 +1,7 @@
 """Pydantic response models for API endpoints."""
 
+from datetime import datetime
+
 from pydantic import BaseModel
 
 
@@ -41,3 +43,27 @@ class TextQAResponse(BaseModel):
     answer: str
     cross_specialty_notes: str | None
     latency_ms: int
+
+
+class FeedbackResponse(BaseModel):
+    """Response body for POST /feedback."""
+    id: str
+    interaction_id: str
+    is_correct: bool
+    comment: str | None
+
+
+class HistoryItemOut(BaseModel):
+    """Summary of one past interaction for the history list."""
+    id: str
+    interaction_type: str
+    timestamp: datetime
+    raw_query: str | None
+    above_threshold: list[str] | None
+    latency_ms: int | None
+
+
+class HistoryResponse(BaseModel):
+    """Response body for GET /history."""
+    items: list[HistoryItemOut]
+    total: int
