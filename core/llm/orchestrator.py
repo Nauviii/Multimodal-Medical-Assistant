@@ -49,16 +49,16 @@ def run_image_llm_pipeline(
         return cached
 
     llm1_user = build_llm1_user_prompt(above_threshold, all_scores, semantic_context)
-    llm1_raw = call_groq(LLM1_SYSTEM, llm1_user, schema=LLM1_SCHEMA, schema_name="rag_queries")
-    llm1_out = parse_llm1_output(llm1_raw)
+    llm1_raw  = call_groq(LLM1_SYSTEM, llm1_user, schema=LLM1_SCHEMA, schema_name="rag_queries")
+    llm1_out  = parse_llm1_output(llm1_raw)
 
     rag_chunks = retrieve_for_image_path(
         llm1_out["rag_queries"], index, namespace, score_threshold=score_threshold
     )
 
     llm2_user = build_llm2_user_prompt(above_threshold, all_scores, semantic_context, rag_chunks)
-    llm2_raw = call_groq(LLM2_SYSTEM, llm2_user, schema=LLM2_SCHEMA, schema_name="clinical_explanation")
-    llm2_out = parse_llm2_output(llm2_raw)
+    llm2_raw  = call_groq(LLM2_SYSTEM, llm2_user, schema=LLM2_SCHEMA, schema_name="clinical_explanation")
+    llm2_out  = parse_llm2_output(llm2_raw)
 
     if not validate_llm2_output(llm2_out):
         raise ValueError("LLM Call 2 output failed clinical safety validation")
@@ -81,11 +81,11 @@ def run_text_llm_pipeline(
     top_k: int = 4,
     score_threshold: float = 0.3,
 ) -> dict:
-    """Run guardrail check, retrieval, cache check, and LLM call for the text Q&A path."""
+    """Run guardrail check, retrieval, cache check, and LLM call; returns bundle for audit logging."""
     query = sanitize_user_input(query)
 
     if check_prompt_injection(query):
-        return REJECTED_QUERY_RESPONSE
+        return {"query_used": query, "rag_chunks": [], "answer_output": REJECTED_QUERY_RESPONSE}
 
     cached = get_cached_text(query)
     if cached is not None:
@@ -100,5 +100,6 @@ def run_text_llm_pipeline(
     if not validate_text_qa_output(parsed):
         raise ValueError("Text Q&A output failed clinical safety validation")
 
-    set_cached_text(query, parsed)
-    return parsed
+    bundle = {"query_used": query, "rag_chunks": rag_chunks, "answer_output": parsed}
+    set_cached_text(query, bundle)
+    return bundle

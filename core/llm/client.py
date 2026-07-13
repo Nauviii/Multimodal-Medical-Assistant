@@ -1,6 +1,8 @@
 """Thin wrapper around Groq API for LLM Call 1 and 2."""
 
-from groq import Groq
+import time
+
+from groq import Groq, RateLimitError
 from config.settings import settings
 
 _client = Groq(api_key=settings.groq_api_key)
@@ -12,10 +14,11 @@ def call_groq(
     schema: dict | None = None,
     schema_name: str | None = None,
     max_tokens: int | None = None,
+    max_retries: int = 3,
 ) -> str:
-    """Call Groq chat completion; uses strict JSON schema mode when schema is given."""
+    
     kwargs = {
-        "model": settings.groq_model,
+        "model":       settings.groq_model,
         "temperature": settings.llm_temperature,
         "max_tokens":  max_tokens or settings.llm_max_tokens,
         "messages": [
@@ -29,5 +32,11 @@ def call_groq(
             "json_schema": {"name": schema_name, "strict": True, "schema": schema},
         }
 
-    response = _client.chat.completions.create(**kwargs)
-    return response.choices[0].message.content
+    for attempt in range(max_retries + 1):
+        try:
+            response = _client.chat.completions.create(**kwargs)
+            return response.choices[0].message.content
+        except RateLimitError:
+            if attempt == max_retries:
+                raise
+            time.sleep(2 ** attempt)
