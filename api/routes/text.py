@@ -4,10 +4,11 @@ import time
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-from pinecone import Pinecone
+from pinecone import Index
 from sqlalchemy.orm import Session as DBSession
 
 from config.settings import settings
+from api.dependencies import get_pinecone_index
 from api.middleware.auth import require_role, TokenPayload
 from api.schemas.requests import TextQARequest
 from api.schemas.responses import TextQAResponse
@@ -17,22 +18,13 @@ from core.llm.orchestrator import run_text_llm_pipeline
 
 router = APIRouter()
 
-_pinecone_index = None
-
-
-def _get_pinecone_index():
-    """Lazily create and cache the Pinecone index connection."""
-    global _pinecone_index
-    if _pinecone_index is None:
-        _pinecone_index = Pinecone(api_key=settings.pinecone_api_key).Index(settings.pinecone_index_name)
-    return _pinecone_index
-
 
 @router.post("/query", response_model=TextQAResponse)
 def text_qa(
     body: TextQARequest,
     user: Annotated[TokenPayload, Depends(require_role("admin", "doctor"))],
     db: Annotated[DBSession, Depends(get_db)],
+    index: Annotated[Index, Depends(get_pinecone_index)],
 ) -> TextQAResponse:
     """Run the text Q&A pipeline and persist the interaction, retrieval log, and LLM output."""
     start = time.perf_counter()
@@ -44,7 +36,7 @@ def text_qa(
     db.commit()
     db.refresh(interaction)
 
-    bundle = run_text_llm_pipeline(body.query, _get_pinecone_index(), settings.pinecone_namespace)
+    bundle = run_text_llm_pipeline(body.query, index, settings.pinecone_namespace)
 
     if bundle["rag_chunks"]:
         db.add(RAGLog(

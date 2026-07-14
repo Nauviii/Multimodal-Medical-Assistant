@@ -1,5 +1,3 @@
-"""POST /analyze/xray — full image pipeline: CLIP validate, CNN, GradCAM, RAG+LLM, DB logging."""
-
 import base64
 import hashlib
 import io
@@ -8,40 +6,23 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from PIL import Image
-from pinecone import Pinecone
+from pinecone import Index
 from sqlalchemy.orm import Session as DBSession
+from torch.nn import Module as TorchModule
 
 from config.settings import settings
+from api.dependencies import get_cnn_model, get_pinecone_index
 from api.middleware.auth import require_role, TokenPayload
 from api.schemas.responses import ImageAnalysisResponse, GradCAMFindingOut, LLMConditionOut
 from scripts.db_session import get_db
 from scripts.db_models import Interaction, CNNResult, GradCAMFinding, RAGLog, LLMOutput
 from core.clip.validator import validate as clip_validate
-from core.cnn.inference import run_inference, load_model
+from core.cnn.inference import run_inference
 from core.gradcam.explainer import run_gradcam
 from core.llm.orchestrator import run_image_llm_pipeline
 from core.storage.supabase_storage import upload_and_sign
 
 router = APIRouter()
-
-_cnn_model = None
-_pinecone_index = None
-
-
-def _get_cnn_model():
-    """Lazily load and cache the DenseNet-121 model in module scope."""
-    global _cnn_model
-    if _cnn_model is None:
-        _cnn_model = load_model()
-    return _cnn_model
-
-
-def _get_pinecone_index():
-    """Lazily create and cache the Pinecone index connection."""
-    global _pinecone_index
-    if _pinecone_index is None:
-        _pinecone_index = Pinecone(api_key=settings.pinecone_api_key).Index(settings.pinecone_index_name)
-    return _pinecone_index
 
 
 @router.post("/analyze/xray", response_model=ImageAnalysisResponse)
@@ -49,6 +30,8 @@ def analyze_xray(
     file: UploadFile,
     user: Annotated[TokenPayload, Depends(require_role("admin", "doctor"))],
     db: Annotated[DBSession, Depends(get_db)],
+    model: Annotated[TorchModule, Depends(get_cnn_model)],
+    index: Annotated[Index, Depends(get_pinecone_index)],
 ) -> ImageAnalysisResponse:
     """Validate, run CNN+GradCAM, retrieve+explain via LLM, and persist the full interaction."""
     start = time.perf_counter()
@@ -60,7 +43,6 @@ def analyze_xray(
     if not validation.is_valid:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, validation.reason)
 
-    model = _get_cnn_model()
     inference_out = run_inference(image, model)
 
     image_hash = hashlib.sha256(raw_bytes).hexdigest()
@@ -111,7 +93,7 @@ def analyze_xray(
         low_confidence_flag=inference_out["low_confidence_flag"],
         gradcam_results=gradcam_out["gradcam_results"],
         semantic_context=gradcam_out["semantic_context"],
-        index=_get_pinecone_index(), namespace=settings.pinecone_namespace,
+        index=index, namespace=settings.pinecone_namespace,
     )
 
     if bundle["llm1_output"] is not None:
