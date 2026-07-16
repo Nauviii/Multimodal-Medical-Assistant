@@ -32,7 +32,7 @@ def get_history(
 
     items = [
         HistoryItemOut(
-            id=i.id, interaction_type=i.interaction_type, timestamp=i.timestamp,
+            id=i.id, conversation_id=i.conversation_id, interaction_type=i.interaction_type, timestamp=i.timestamp,
             raw_query=i.raw_query,
             above_threshold=i.cnn_result.above_threshold if i.cnn_result else None,
             latency_ms=i.latency_ms,

@@ -4,8 +4,9 @@ from pydantic import BaseModel
 
 
 class TextQARequest(BaseModel):
-    """Request body for POST /query — a free-text clinical question."""
+    """Request body for POST /query — a free-text clinical question, optionally continuing a conversation."""
     query: str
+    conversation_id: str | None = None
 
 
 class FeedbackRequest(BaseModel):

@@ -80,20 +80,36 @@ def run_text_llm_pipeline(
     namespace: str,
     top_k: int = 4,
     score_threshold: float = 0.3,
+    prior_context: dict | None = None,
 ) -> dict:
-    """Run guardrail check, retrieval, cache check, and LLM call; returns bundle for audit logging."""
+    """Run guardrail check, retrieval, cache check, and LLM call; returns bundle for audit logging.
+
+    When prior_context is given (a follow-up in an ongoing conversation), the pattern-based
+    cache is skipped entirely — cached answers are cross-patient by design and would be wrong
+    for a conversation-specific follow-up. The retrieval query is also enriched with prior
+    finding condition names so RAG stays anchored to the same case.
+    """
     query = sanitize_user_input(query)
 
     if check_prompt_injection(query):
         return {"query_used": query, "rag_chunks": [], "answer_output": REJECTED_QUERY_RESPONSE}
 
-    cached = get_cached_text(query)
-    if cached is not None:
-        return cached
+    is_followup = prior_context is not None
 
-    rag_chunks = retrieve_for_text_path(query, index, namespace, top_k, score_threshold)
+    if not is_followup:
+        cached = get_cached_text(query)
+        if cached is not None:
+            return cached
 
-    user_prompt = build_text_qa_user_prompt(query, rag_chunks)
+    retrieval_query = query
+    if is_followup:
+        above = prior_context.get("above_threshold") or []
+        if above:
+            retrieval_query = f"{query} ({', '.join(above)})"
+
+    rag_chunks = retrieve_for_text_path(retrieval_query, index, namespace, top_k, score_threshold)
+
+    user_prompt = build_text_qa_user_prompt(query, rag_chunks, prior_context)
     raw = call_groq(TEXT_QA_SYSTEM, user_prompt, schema=TEXT_QA_SCHEMA, schema_name="text_qa_answer")
     parsed = parse_text_qa_output(raw)
 
@@ -101,5 +117,6 @@ def run_text_llm_pipeline(
         raise ValueError("Text Q&A output failed clinical safety validation")
 
     bundle = {"query_used": query, "rag_chunks": rag_chunks, "answer_output": parsed}
-    set_cached_text(query, bundle)
+    if not is_followup:
+        set_cached_text(query, bundle)
     return bundle

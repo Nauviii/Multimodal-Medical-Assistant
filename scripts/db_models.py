@@ -56,6 +56,7 @@ class Interaction(Base):
 
     id = Column(String, primary_key=True, default=_uuid)
     session_id = Column(String, ForeignKey("sessions.id"), nullable=False)
+    conversation_id = Column(String, ForeignKey("interactions.id"), nullable=False, index=True)
     interaction_type = Column(String, nullable=False)   
     raw_query = Column(Text, nullable=True)       
     image_hash = Column(String, nullable=True)    

@@ -179,6 +179,10 @@ TEXT_QA_SYSTEM = """You are a clinical decision-support AI assisting radiologist
 who are domain experts. The user is asking a direct clinical question — do not include generic \
 disclaimers or instructions to consult a physician.
 
+If prior image findings or conversation history are provided, treat this as a continuing \
+discussion about the same case — refer to those findings naturally rather than re-explaining \
+them from scratch.
+
 Based on the retrieved clinical knowledge, answer clearly and accurately.
 
 Output ONLY valid JSON with this exact schema:
@@ -204,14 +208,34 @@ TEXT_QA_SCHEMA = {
 }
 
 
-def build_text_qa_user_prompt(query: str, rag_chunks: list[dict]) -> str:
-    """Build the user message for text Q&A from the sanitized query and retrieved chunks."""
-    if not rag_chunks:
-        return f"Question: {query}\n\nNo relevant knowledge base entries retrieved."
-    knowledge_str = "\n\n".join(
-        f"[{c['condition']} - {c['section']}]: {c['text']}" for c in rag_chunks
-    )
-    return f"Question: {query}\n\nRetrieved clinical knowledge:\n{knowledge_str}"
+def build_text_qa_user_prompt(
+    query: str,
+    rag_chunks: list[dict],
+    prior_context: dict | None = None,
+) -> str:
+    """Build the user message for text Q&A from the query, retrieved chunks, and optional prior context."""
+    parts = []
+
+    if prior_context:
+        above = prior_context.get("above_threshold") or []
+        if above:
+            parts.append(f"Prior image findings in this conversation: {', '.join(above)}")
+        conversation = prior_context.get("conversation") or []
+        if conversation:
+            history_str = "\n".join(f"{t['role']}: {t['content']}" for t in conversation[-6:])
+            parts.append(f"Recent conversation history:\n{history_str}")
+
+    parts.append(f"Question: {query}")
+
+    if rag_chunks:
+        knowledge_str = "\n\n".join(
+            f"[{c['condition']} - {c['section']}]: {c['text']}" for c in rag_chunks
+        )
+        parts.append(f"Retrieved clinical knowledge:\n{knowledge_str}")
+    else:
+        parts.append("No relevant knowledge base entries retrieved.")
+
+    return "\n\n".join(parts)
 
 
 def parse_text_qa_output(text: str) -> dict:

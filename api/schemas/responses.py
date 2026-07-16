@@ -28,6 +28,8 @@ class LLMConditionOut(BaseModel):
 
 class ImageAnalysisResponse(BaseModel):
     """Full response body for POST /analyze/xray."""
+    interaction_id: str
+    conversation_id: str
     all_scores: dict[str, float]
     above_threshold: list[str]
     low_confidence_flag: bool
@@ -40,6 +42,8 @@ class ImageAnalysisResponse(BaseModel):
 
 class TextQAResponse(BaseModel):
     """Response body for POST /query."""
+    interaction_id: str
+    conversation_id: str
     answer: str
     cross_specialty_notes: str | None
     latency_ms: int
@@ -56,6 +60,7 @@ class FeedbackResponse(BaseModel):
 class HistoryItemOut(BaseModel):
     """Summary of one past interaction for the history list."""
     id: str
+    conversation_id: str
     interaction_type: str
     timestamp: datetime
     raw_query: str | None
@@ -67,3 +72,26 @@ class HistoryResponse(BaseModel):
     """Response body for GET /history."""
     items: list[HistoryItemOut]
     total: int
+
+
+class ConversationTurnOut(BaseModel):
+    """One turn in a conversation transcript."""
+    interaction_id: str
+    interaction_type: str
+    timestamp: datetime
+    query: str | None = None
+    answer: str | None = None
+    above_threshold: list[str] | None = None
+    clinical_summary: str | None = None
+
+
+class ConversationTranscriptResponse(BaseModel):
+    """Response body for GET /conversation/{conversation_id}."""
+    conversation_id: str
+    turns: list[ConversationTurnOut]
+
+
+class ConversationCloseResponse(BaseModel):
+    """Response body for DELETE /conversation/{conversation_id}."""
+    conversation_id: str
+    closed: bool

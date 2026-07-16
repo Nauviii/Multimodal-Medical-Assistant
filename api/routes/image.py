@@ -1,10 +1,18 @@
+"""POST /analyze/xray — full image pipeline: CLIP validate, CNN, GradCAM, RAG+LLM, DB logging.
+
+Route is a sync def deliberately: every SDK used here (Groq, Pinecone, supabase-py,
+SQLAlchemy, PyTorch inference) is synchronous. FastAPI runs sync def routes in a
+threadpool automatically, which is correct for blocking calls.
+"""
+
 import base64
 import hashlib
 import io
 import time
+import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, status
 from PIL import Image
 from pinecone import Index
 from sqlalchemy.orm import Session as DBSession
@@ -21,6 +29,7 @@ from core.cnn.inference import run_inference
 from core.gradcam.explainer import run_gradcam
 from core.llm.orchestrator import run_image_llm_pipeline
 from core.storage.supabase_storage import upload_and_sign
+from core.memory.session_memory import get_session, save_session, is_conversation_closed
 
 router = APIRouter()
 
@@ -32,8 +41,14 @@ def analyze_xray(
     db: Annotated[DBSession, Depends(get_db)],
     model: Annotated[TorchModule, Depends(get_cnn_model)],
     index: Annotated[Index, Depends(get_pinecone_index)],
+    conversation_id: Annotated[str | None, Form()] = None,
 ) -> ImageAnalysisResponse:
-    """Validate, run CNN+GradCAM, retrieve+explain via LLM, and persist the full interaction."""
+    """Validate, run CNN+GradCAM, retrieve+explain via LLM, and persist the full interaction.
+
+    conversation_id, if given, anchors this upload to an existing conversation (e.g. a second
+    view of the same case) — working memory is overwritten with the newest findings while the
+    conversation log keeps growing. If omitted, this upload starts a brand new conversation.
+    """
     start = time.perf_counter()
 
     raw_bytes = file.file.read()
@@ -50,7 +65,11 @@ def analyze_xray(
         settings.supabase_xray_bucket, f"{image_hash}.png", raw_bytes, "image/png"
     )
 
+    interaction_id = str(uuid.uuid4())
+    resolved_conversation_id = conversation_id or interaction_id
+
     interaction = Interaction(
+        id=interaction_id, conversation_id=resolved_conversation_id,
         session_id=user.session_id, interaction_type="image",
         image_hash=image_hash, xray_storage_url=xray_url,
     )
@@ -122,7 +141,21 @@ def analyze_xray(
     interaction.latency_ms = int((time.perf_counter() - start) * 1000)
     db.commit()
 
+    # Update working memory: overwrite current findings, keep appending to the conversation log
+    if not is_conversation_closed(resolved_conversation_id):
+        state = get_session(resolved_conversation_id) or {"conversation": []}
+        state["above_threshold"] = inference_out["above_threshold"]
+        findings_str = ", ".join(inference_out["above_threshold"]) or "no significant findings"
+        state["conversation"].append({
+            "role": "system",
+            "content": f"[Image analysis ({interaction.id}): {findings_str}] "
+                       f"{bundle['llm2_output']['clinical_summary']}",
+        })
+        save_session(resolved_conversation_id, state)
+
     return ImageAnalysisResponse(
+        interaction_id=interaction.id,
+        conversation_id=resolved_conversation_id,
         all_scores=inference_out["all_scores"],
         above_threshold=inference_out["above_threshold"],
         low_confidence_flag=inference_out["low_confidence_flag"],
