@@ -56,7 +56,7 @@ def analyze_xray(
 
     validation = clip_validate(image)
     if not validation.is_valid:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, validation.reason)
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, validation.reason)
 
     inference_out = run_inference(image, model)
 

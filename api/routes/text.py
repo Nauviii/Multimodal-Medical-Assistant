@@ -39,7 +39,7 @@ def text_qa(
     start = time.perf_counter()
 
     interaction_id = str(uuid.uuid4())
-    is_followup = body.conversation_id is not None
+    is_followup = bool(body.conversation_id)
     resolved_conversation_id = body.conversation_id or interaction_id
 
     prior_context = None
