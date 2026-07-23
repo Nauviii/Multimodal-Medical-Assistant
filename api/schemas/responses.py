@@ -95,3 +95,11 @@ class ConversationCloseResponse(BaseModel):
     """Response body for DELETE /conversation/{conversation_id}."""
     conversation_id: str
     closed: bool
+
+class SqlAgentResponse(BaseModel):
+    """Response body for POST /agent/query."""
+    sql_executed: str | None
+    explanation: str
+    rows: list[dict]
+    row_count: int
+    latency_ms: int

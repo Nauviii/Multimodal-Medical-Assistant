@@ -60,9 +60,17 @@ def analyze_xray(
 
     inference_out = run_inference(image, model)
 
-    image_hash = hashlib.sha256(raw_bytes).hexdigest()
+    # Normalize to PNG regardless of the original upload format (JPEG, BMP, etc.) —
+    # keeps the storage extension/content-type truthful and applies Pillow's lossless
+    # PNG optimization. No lossy compression is applied: pixel values are unaltered,
+    # which matters for diagnostic imagery that CNN/GradCAM analysis depends on.
+    png_buffer = io.BytesIO()
+    image.convert("RGB").save(png_buffer, format="PNG", optimize=True)
+    normalized_bytes = png_buffer.getvalue()
+
+    image_hash = hashlib.sha256(normalized_bytes).hexdigest()
     xray_url = upload_and_sign(
-        settings.supabase_xray_bucket, f"{image_hash}.png", raw_bytes, "image/png"
+        settings.supabase_xray_bucket, f"{image_hash}.png", normalized_bytes, "image/png"
     )
 
     interaction_id = str(uuid.uuid4())

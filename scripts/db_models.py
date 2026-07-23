@@ -140,3 +140,20 @@ class UserFeedback(Base):
     submitted_at = Column(DateTime, default=_now)
 
     interaction = relationship("Interaction", back_populates="feedback")
+
+class SqlAgentLog(Base):
+    """Audit log of one NL-to-SQL agent query: question asked, SQL executed, and result size.
+
+    Written via the main database_url connection (audit write), separate from the
+    sql_agent_readonly connection the agent itself uses to execute the generated SQL —
+    the read-only role deliberately has no INSERT privilege anywhere, including here.
+    """
+    __tablename__ = "sql_agent_logs"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    role = Column(String, nullable=False)          # role at query time: "admin" | "doctor"
+    question = Column(Text, nullable=False)
+    sql_executed = Column(Text, nullable=True)     # null if guardrail/execution failed even after retry
+    row_count = Column(Integer, nullable=False)
+    timestamp = Column(DateTime, default=_now)

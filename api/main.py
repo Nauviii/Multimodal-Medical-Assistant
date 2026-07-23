@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.dependencies import get_cnn_model, get_pinecone_index
-from api.routes import auth, image, text, feedback, history, conversation
+from api.routes import auth, image, text, feedback, history, conversation, agent
 
 
 @asynccontextmanager
@@ -33,6 +33,7 @@ app.include_router(text.router, tags=["text"])
 app.include_router(feedback.router, tags=["feedback"])
 app.include_router(history.router, tags=["history"])
 app.include_router(conversation.router, tags=["conversation"])
+app.include_router(agent.router, tags=["agent"])
 
 
 @app.get("/health")

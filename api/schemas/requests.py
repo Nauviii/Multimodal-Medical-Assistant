@@ -14,3 +14,7 @@ class FeedbackRequest(BaseModel):
     interaction_id: str
     is_correct: bool
     comment: str | None = None
+
+class SqlAgentRequest(BaseModel):
+    """Request body for POST /agent/query — a natural language analytics question."""
+    question: str
